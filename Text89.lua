@@ -2,6 +2,12 @@
 --// Sheriffs / Criminals / NPCs (NPCs = criminal)
 --// RAW / LOCAL
 
+if not game:IsLoaded() then
+	game.Loaded:Wait()
+end
+
+repeat task.wait() until game.Players.LocalPlayer
+
 local Players = game:GetService("Players")
 local Workspace = game:GetService("Workspace")
 local LocalPlayer = Players.LocalPlayer
