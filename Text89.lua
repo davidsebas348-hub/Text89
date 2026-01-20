@@ -21,7 +21,7 @@ local highlights = {}
 local visibleStates = {}
 _G.ESPHighlights = highlights
 
-local NPC_FOLDER = Workspace:FindFirstChild("NPCs")
+local NPC_FOLDER = Workspace:FindFirstChild("NPCs") -- ajusta si tus NPCs están en otra carpeta
 
 -- ================= FUNCIONES =================
 local function obtenerMiRol()
@@ -69,7 +69,7 @@ local function actualizarJugadores()
 				and Color3.fromRGB(0,0,255)
 				or Color3.fromRGB(255,0,0)
 
-			local visible = (rol ~= miRol)
+			local visible = (rol ~= miRol) -- como antes
 			aplicarHighlight(plr.Character, color, visible)
 		end
 	end
@@ -81,6 +81,7 @@ local function actualizarNPCs()
 
 	for _, npc in pairs(NPC_FOLDER:GetChildren()) do
 		if npc:IsA("Model") then
+			-- Forzar siempre visible y rojo, sin importar tu rol
 			aplicarHighlight(npc, Color3.fromRGB(255,0,0), true)
 		end
 	end
