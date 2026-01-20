@@ -1,102 +1,111 @@
---// ESP Dinámico "Equipo" Npc or Die con destrucción automática
---// Solo resalta tu equipo
+--// ESP Dinámico Npc or Die con toggle y auto-update SIN LAG
+--// Sheriffs / Criminals / NPCs (NPCs = criminal)
 --// RAW / LOCAL
 
 local Players = game:GetService("Players")
-local RunService = game:GetService("RunService")
+local Workspace = game:GetService("Workspace")
 local LocalPlayer = Players.LocalPlayer
 
--- ======== DESTRUCCIÓN SI YA EXISTE ========
-if _G.ESPTeamTexts then
-	for target, textLabel in pairs(_G.ESPTeamTexts) do
-		if textLabel and textLabel.Parent then
-			textLabel.Parent:Destroy()
-		end
+-- ================= TOGGLE =================
+if _G.ESPHighlights then
+	for _, hl in pairs(_G.ESPHighlights) do
+		if hl then hl:Destroy() end
 	end
-	_G.ESPTeamTexts = nil
-	print("ESP de equipo destruido ❌")
+	_G.ESPHighlights = nil
+	print("ESP destruido ❌")
 	return
 end
 
--- ======== VARIABLES ========
-local espTexts = {}
-_G.ESPTeamTexts = espTexts
+-- ================= VARIABLES =================
+local highlights = {}
+local visibleStates = {}
+_G.ESPHighlights = highlights
 
--- ======== FUNCIONES ========
+local NPC_FOLDER = Workspace:FindFirstChild("NPCs")
+
+-- ================= FUNCIONES =================
 local function obtenerMiRol()
-	if LocalPlayer.Team then
-		local t = LocalPlayer.Team.Name:lower()
-		if t == "sheriffs" then
-			return "sheriff"
-		elseif t == "criminals" then
-			return "criminal"
-		else
-			return "lobby"
-		end
-	else
-		return "lobby"
+	if LocalPlayer.Team and LocalPlayer.Team.Name:lower() == "sheriffs" then
+		return "sheriff"
+	end
+	return "criminal"
+end
+
+local function aplicarHighlight(model, color, visible)
+	if not model or not model:IsA("Model") then return end
+
+	if not highlights[model] then
+		local hl = Instance.new("Highlight")
+		hl.Name = "ESP_Highlight"
+		hl.Adornee = model
+		hl.FillTransparency = 0.5
+		hl.OutlineTransparency = 0
+		hl.Parent = Workspace
+		highlights[model] = hl
+	end
+
+	local hl = highlights[model]
+	hl.FillColor = color
+	hl.OutlineColor = color
+
+	if visibleStates[model] ~= visible then
+		hl.Enabled = visible
+		visibleStates[model] = visible
 	end
 end
 
-local function aplicarTexto(target, color, visible)
-	if not target or not target:IsA("Model") then return end
-	local head = target:FindFirstChild("Head")
-	if not head then return end
-
-	if not espTexts[target] then
-		local billboard = Instance.new("BillboardGui")
-		billboard.Name = "ESP_Team_Text"
-		billboard.Adornee = head
-		billboard.Size = UDim2.new(0, 100, 0, 50)
-		billboard.StudsOffset = Vector3.new(0, 2, 0)
-		billboard.AlwaysOnTop = true
-		billboard.Parent = head
-
-		local textLabel = Instance.new("TextLabel")
-		textLabel.Size = UDim2.new(1, 0, 1, 0)
-		textLabel.BackgroundTransparency = 1
-		textLabel.TextScaled = false
-		textLabel.Font = Enum.Font.SourceSansBold
-		textLabel.TextColor3 = color
-		textLabel.TextStrokeTransparency = 0
-		textLabel.Text = "Equipo"
-		textLabel.Parent = billboard
-
-		espTexts[target] = textLabel
-	end
-
-	local textLabel = espTexts[target]
-	textLabel.TextColor3 = color
-	textLabel.Visible = visible
-end
-
--- ======== LOOP ESP ========
-local conn
-conn = RunService.Heartbeat:Connect(function()
+-- ================= ACTUALIZAR JUGADORES =================
+local function actualizarJugadores()
 	local miRol = obtenerMiRol()
 
 	for _, plr in pairs(Players:GetPlayers()) do
-		if plr ~= LocalPlayer and plr.Character then
-			local playerRol
-			if plr.Team then
-				local t = plr.Team.Name:lower()
-				playerRol = (t == "sheriffs") and "sheriff" or "criminal"
-			else
-				playerRol = "lobby"
+		if plr.Character then
+			local rol = "criminal"
+			if plr.Team and plr.Team.Name:lower() == "sheriffs" then
+				rol = "sheriff"
 			end
 
-			local color = Color3.fromRGB(0, 255, 0) -- verde para equipo
-			local visible = (playerRol == miRol) -- solo tu mismo equipo
+			local color = (rol == "sheriff")
+				and Color3.fromRGB(0,0,255)
+				or Color3.fromRGB(255,0,0)
 
-			aplicarTexto(plr.Character, color, visible)
+			local visible = (rol ~= miRol)
+			aplicarHighlight(plr.Character, color, visible)
 		end
 	end
+end
+
+-- ================= ACTUALIZAR NPCs =================
+local function actualizarNPCs()
+	if not NPC_FOLDER then return end
+
+	for _, npc in pairs(NPC_FOLDER:GetChildren()) do
+		if npc:IsA("Model") then
+			aplicarHighlight(npc, Color3.fromRGB(255,0,0), true)
+		end
+	end
+end
+
+-- ================= EVENTOS =================
+Players.PlayerAdded:Connect(function(plr)
+	plr.CharacterAdded:Connect(actualizarJugadores)
 end)
 
--- ======== LIMPIEZA ========
-Players.PlayerRemoving:Connect(function(player)
-	if player.Character and espTexts[player.Character] then
-		espTexts[player.Character].Parent:Destroy()
-		espTexts[player.Character] = nil
+for _, plr in pairs(Players:GetPlayers()) do
+	if plr.Character then
+		plr.CharacterAdded:Connect(actualizarJugadores)
+	end
+end
+
+if NPC_FOLDER then
+	NPC_FOLDER.ChildAdded:Connect(actualizarNPCs)
+end
+
+-- ================= LOOP DE RESPALDO (ANTI BUGS) =================
+task.spawn(function()
+	while _G.ESPHighlights do
+		actualizarJugadores()
+		actualizarNPCs()
+		task.wait(1) -- solo 1 vez por segundo (cero lag)
 	end
 end)
